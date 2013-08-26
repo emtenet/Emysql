@@ -66,6 +66,9 @@ execute(Connection, StmtName, []) when is_atom(StmtName) ->
     Packet = <<?COM_QUERY, "EXECUTE ", StmtNameBin/binary>>,
     emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0);
 
+execute(Connection, transaction, Function) when is_function(Function) ->
+    transaction(Connection, Function);
+
 execute(Connection, Query, Args) when (is_list(Query) orelse is_binary(Query)) andalso is_list(Args) ->
     StmtName = "stmt_"++integer_to_list(erlang:phash2(Query)),
     ok = prepare(Connection, StmtName, Query),
@@ -110,6 +113,38 @@ unprepare(Connection, Name) when is_atom(Name)->
 unprepare(Connection, Name) ->
     Packet = <<?COM_QUERY, "DEALLOCATE PREPARE ", (list_to_binary(Name))/binary>>,  % todo: utf8?
     emysql_tcp:send_and_recv_packet(Connection#emysql_connection.socket, Packet, 0).
+
+transaction(Connection, Function) ->
+    case begin_transaction(Connection) of
+        #ok_packet{} ->
+            try Function(Connection) of
+                Val ->
+                    case commit_transaction(Connection) of
+                        #ok_packet{} ->
+                            {atomic, Val};
+                        #error_packet{} = ErrorPacket ->
+                            {aborted, {commit_error, ErrorPacket}}
+                    end
+            catch
+                throw:Reason ->
+                    rollback_transaction(Connection),
+                    {aborted, Reason};
+                Class:Exception ->
+                    rollback_transaction(Connection),
+                    erlang:raise(Class, Exception, erlang:get_stacktrace())
+            end;
+        #error_packet{} = ErrorPacket ->
+            {aborted, {begin_error, ErrorPacket}}
+    end.
+  
+begin_transaction(Connection) ->
+    emysql_conn:execute(Connection, <<"BEGIN">>, []).
+
+rollback_transaction(Connection) ->
+    emysql_conn:execute(Connection, <<"ROLLBACK">>, []).
+
+commit_transaction(Connection) ->
+    emysql_conn:execute(Connection, <<"COMMIT">>, []).
 
 open_n_connections(PoolId, N) ->
     case emysql_conn_mgr:find_pool(PoolId, emysql_conn_mgr:pools()) of

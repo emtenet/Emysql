@@ -100,6 +100,7 @@
             add_pool/8, remove_pool/1, increment_pool_size/2, decrement_pool_size/2,
             prepare/2,
             execute/2, execute/3, execute/4, execute/5,
+            transaction/2, transaction/3, abort/1,
             default_timeout/0,
             modules/0
         ]).
@@ -531,6 +532,16 @@ execute(PoolId, StmtName, Args, Timeout, nonblocking) when is_atom(StmtName), is
         unavailable ->
             unavailable
     end.
+
+transaction(PoolId, Function) when is_function(Function, 1) ->
+    transaction(PoolId, Function, default_timeout()).
+
+transaction(PoolId, Function, Timeout) when is_function(Function, 1) andalso is_integer(Timeout) ->
+    Connection = emysql_conn_mgr:wait_for_connection(PoolId),
+    monitor_work(Connection, Timeout, [Connection, transaction, Function]).
+
+abort(Reason) ->
+    throw(Reason).
 
 %%--------------------------------------------------------------------
 %%% Internal functions
