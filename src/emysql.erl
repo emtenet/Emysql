@@ -396,6 +396,9 @@ prepare(StmtName, Statement) when is_atom(StmtName) andalso (is_list(Statement) 
 %% @see prepare/2.
 %% @end doc: hd feb 11
 %%
+execute(Connection, Query) when is_record(Connection, emysql_connection) ->
+    emysql_conn:execute(Connection, Query, []);
+
 execute(PoolId, Query) when (is_list(Query) orelse is_binary(Query)) ->
     execute(PoolId, Query, []);
 
@@ -425,6 +428,9 @@ execute(PoolId, StmtName) when is_atom(StmtName) ->
 %% @see prepare/2.
 %% @end doc: hd feb 11
 %%
+
+execute(Connection, Query, Args) when is_record(Connection, emysql_connection) ->
+    emysql_conn:execute(Connection, Query, Args);
 
 execute(PoolId, Query, Args) when (is_list(Query) orelse is_binary(Query)) andalso is_list(Args) ->
     execute(PoolId, Query, Args, default_timeout());
@@ -541,7 +547,7 @@ transaction(PoolId, Function, Timeout) when is_function(Function, 1) andalso is_
     monitor_work(Connection, Timeout, [Connection, transaction, Function]).
 
 abort(Reason) ->
-    throw(Reason).
+    throw({'emysql$abort', Reason}).
 
 %%--------------------------------------------------------------------
 %%% Internal functions

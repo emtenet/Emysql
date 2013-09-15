@@ -81,6 +81,12 @@ test9: all
 testutil: all
 	(cd test; ct_run -suite as_record_SUITE -cover as_record.cover -pa ../ebin $(CRYPTO_PATH))
 
+test-transaction: all
+	(cd test; ct_run -suite transaction_SUITE -pa ../ebin $(CRYPTO_PATH))
+
+test-emtenet: all
+	(cd test; ct_run -suite emtenet_SUITE -pa ../ebin $(CRYPTO_PATH))
+
 prove: all
 	(cd t;$(MAKE))
 	prove t/*.t

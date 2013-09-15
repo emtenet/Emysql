@@ -126,7 +126,7 @@ transaction(Connection, Function) ->
                             {aborted, {commit_error, ErrorPacket}}
                     end
             catch
-                throw:Reason ->
+                throw:{'emysql$abort', Reason} ->
                     rollback_transaction(Connection),
                     {aborted, Reason};
                 Class:Exception ->
