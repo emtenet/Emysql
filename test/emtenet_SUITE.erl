@@ -41,6 +41,7 @@ init_per_suite(Config) ->
 	Config.
     
 end_per_suite(_) ->
+	emysql:remove_pool(?POOL),
 	ok.
 
 %%--------------------------------------------------------------------

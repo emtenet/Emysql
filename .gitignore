@@ -18,5 +18,9 @@ test/*.html
 test/ct_run*
 test/variables-ct*
 test/ct_default.css
+test/jquery*
+test/ct_log_cache
 logs/*
 .#*
+include/crypto_compat.hrl
+_build

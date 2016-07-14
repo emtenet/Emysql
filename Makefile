@@ -1,27 +1,26 @@
 LIBDIR=$(shell erl -eval 'io:format("~s~n", [code:lib_dir()])' -s init stop -noshell)
-VERSION=0.3.0
+VERSION=0.4.1
 PKGNAME=emysql
 APP_NAME=emysql
-CRYPTO_PATH=/opt/local/var/macports/software/erlang/R14A_0/opt/local/lib/erlang/lib/crypto-2.0/ebin/
 
 MODULES=$(shell ls -1 src/*.erl | awk -F[/.] '{ print $$2 }' | sed '$$q;s/$$/,/g')
 MAKETIME=$(shell date)
 
-all: app
+all: crypto_compat app
 	(cd src;$(MAKE))
 
 app: ebin/$(PKGNAME).app
 
+crypto_compat:
+	(escript support/crypto_compat.escript)
+
 ebin/$(PKGNAME).app: src/$(PKGNAME).app.src
 	mkdir -p ebin
-	sed -e 's/modules, \[\]/{modules, [$(MODULES)]}/;s/%MAKETIME%/$(MAKETIME)/' < $< > $@
+	sed -e 's/modules, \[\]/modules, [$(MODULES)]/;s/%MAKETIME%/$(MAKETIME)/' < $< > $@
 
 # Create doc HTML from source comments
 docs:
-	sed -E -f doc/markedoc.sed README.md > doc/readme.edoc
-	sed -E -f doc/markedoc.sed CHANGES.md > doc/changes.edoc
 	erl -noshell -run edoc_run application "'emysql'" '"."' '[{def,{vsn,""}},{stylesheet, "emysql-style.css"}]'
-	sed -E -i "" -e "s/<table width=\"100%\" border=\"1\"/<table width=\"100%\" class=index border=\"0\"/" doc/*.html
 
 # Pushes created docs into dir ../Emysql-github-pages to push to github pages.
 # Make sure to do 'make docs' first.
@@ -55,6 +54,8 @@ clean:
 	rm -f variables-ct*
 	rm -f *.beam
 	rm -f *.html
+	rm -f include/crypto_compat.hrl
+	rm -fr logs
 
 package: clean
 	@mkdir $(PKGNAME)-$(VERSION)/ && cp -rf ebin include Makefile README src support t $(PKGNAME)-$(VERSION)
@@ -64,22 +65,26 @@ package: clean
 install:
 	@for i in ebin/*.beam ebin/*.app include/*.hrl src/*.erl; do install -m 644 -D $$i $(prefix)/$(LIBDIR)/$(PKGNAME)-$(VERSION)/$$i ; done
 
-all-test: test encoding-test test20 testutil
+all-test: test
 
-encoding-test: all
-	(cd test; ct_run -suite latin_SUITE utf8_SUITE utf8_to_latindb_SUITE latin_to_utf8db_SUITE -pa ../ebin $(CRYPTO_PATH))
+CT_OPTS ?=
+CT_RUN = ct_run \
+        -no_auto_compile \
+        -noshell \
+        -pa $(realpath ebin) \
+        -dir test \
+        -logdir logs \
+        -cover test/cover.spec -cover_stop false \
+        $(CT_OPTS)
+# Currently, the order of the test cases matter!
+CT_SUITES=environment basics conn_mgr
 
-test: all
-	(cd test; ct_run -suite environment_SUITE basics_SUITE conn_mgr_SUITE -pa ../ebin $(CRYPTO_PATH))
+build-tests:
+	erlc -v -o test/ $(wildcard test/*.erl) -pa ebin/
 
-test20: all
-	(cd test; ct_run -suite pool_SUITE -pa ../ebin $(CRYPTO_PATH))
-
-test9: all
-	(cd test; ct_run -suite con_mgr_SUITE -pa ../ebin $(CRYPTO_PATH))
-
-testutil: all
-	(cd test; ct_run -suite as_record_SUITE -cover as_record.cover -pa ../ebin $(CRYPTO_PATH))
+test: all build-tests
+	@mkdir -p logs
+	$(CT_RUN) -suite $(addsuffix _SUITE,$(CT_SUITES)) ; \
 
 test-transaction: all
 	(cd test; ct_run -suite transaction_SUITE -pa ../ebin $(CRYPTO_PATH))

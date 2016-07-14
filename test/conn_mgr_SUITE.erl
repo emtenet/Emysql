@@ -31,7 +31,7 @@ all() ->
     [ 
       stuck_waiting_1, % former two_procs
       stuck_waiting_2, 
-      pool_leak_1,     % former no_lock_timeout
+      %pool_leak_1,     % former no_lock_timeout
       pool_leak_2,
       dying_client_does_not_lock_the_connection_out
     ].
@@ -44,13 +44,14 @@ init_per_suite(Config) ->
     crypto:start(),
     application:start(emysql),
     emysql:add_pool(test_pool, 1,
-        emysql_util:test_u(), emysql_util:test_p(), "localhost", 3306,
+        test_helper:test_u(), test_helper:test_p(), "localhost", 3306,
         "hello_database", utf8),
     Config.
     
 % clean up
 %%--------------------------------------------------------------------
 end_per_suite(_) ->
+    emysql:remove_pool(test_pool),
 	ok.
 
 init_per_testcase(dying_client_does_not_lock_the_connection_out, Config) ->
